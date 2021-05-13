@@ -1,0 +1,5 @@
+pika
+celery==4.4.7
+flask==1.1.2
+gunicorn
+python-decouple

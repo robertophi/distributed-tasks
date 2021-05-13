@@ -1,0 +1,65 @@
+version: '3.5'
+
+
+services:
+  supervisor:
+    build:
+      context: .
+      dockerfile: docker/publisher.Dockerfile
+    command: gunicorn api.publisher:flask_app -w 1 --threads 1 -b 0.0.0.0:8000
+    volumes:
+      - ./logs:/src/logs
+    restart: "no"
+    environment:
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672
+      - CELERY_BACKEND_URL=amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      - rabbitmq
+    networks:
+      - rabbitmq_network
+    ports:
+      - 8000:8000
+
+
+  service_a:
+    build:
+      context: .
+      dockerfile: docker/consumerA.Dockerfile
+    command: "celery -A consumerA.consumer worker --loglevel=debug -Q consumer.A --without-gossip --without-mingle --without-heartbeat --pool=solo"
+    restart: "no"
+    environment:
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672
+      - CELERY_BACKEND_URL=amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      - rabbitmq
+    networks:
+      - rabbitmq_network
+
+
+  service_b:
+    build:
+      context: .
+      dockerfile: docker/consumerB.Dockerfile
+    command: "celery -A consumerB.consumer worker --loglevel=debug -Q consumer.B --without-gossip --without-mingle --without-heartbeat --autoscale 4,1"
+    restart: "no"
+    environment:
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672
+      - CELERY_BACKEND_URL=amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      - rabbitmq
+    networks:
+      - rabbitmq_network
+
+  rabbitmq:
+    hostname: rabbitmq
+    image: rabbitmq:3
+    ports:
+      - 5672:5672
+      - 5671:5671
+    networks:
+      - rabbitmq_network
+
+
+networks:
+  rabbitmq_network:
+    driver: bridge
